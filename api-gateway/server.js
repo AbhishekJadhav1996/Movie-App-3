@@ -16,13 +16,23 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', upstream: MOVIE_SERVICE_URL });
 });
 
-// Proxy all /api/movies requests to backend
+// Proxy /api/movies and /movies to backend
 app.use(
   '/api/movies',
   createProxyMiddleware({
     target: MOVIE_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/movies': '/api/movies' },
+    logLevel: 'debug',
+  })
+);
+
+app.use(
+  '/movies',
+  createProxyMiddleware({
+    target: MOVIE_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/movies': '/api/movies' },
     logLevel: 'debug',
   })
 );

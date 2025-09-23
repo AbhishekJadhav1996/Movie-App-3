@@ -1,21 +1,31 @@
-FROM node:22-alpine
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json first for caching
+# Copy package files for caching
 COPY package*.json ./
 
-# Install dependencies with legacy peer deps
+# Install dependencies
 RUN npm install --legacy-peer-deps --no-audit --no-fund
 
-# Copy rest of the source code
+# Build-time API URL
+ARG REACT_APP_API_BASE_URL
+ENV REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}
+
+# Copy source and build
 COPY . .
+RUN npm run build
 
-# Use environment variables from Docker/compose
+FROM node:22-alpine AS runtime
+WORKDIR /app
+
+# Install a static server
+RUN npm i -g serve@14.2.4
+
+# Copy build output
+COPY --from=build /app/build ./build
+
 ENV PORT=3000
-ENV HOST=0.0.0.0
-
 EXPOSE 3000
 
-# Start React app and bind to 0.0.0.0 for EC2 public access
-CMD ["npm", "start", "--", "--host", "0.0.0.0"]
+CMD ["serve", "-s", "build", "-l", "3000"]

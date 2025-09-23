@@ -32,7 +32,7 @@ app.use(
   createProxyMiddleware({
     target: MOVIE_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: { '^/movies': '/api/movies' },
+    pathRewrite: (path) => path.replace(/^\/movies(\/|$)/, '/api/movies$1'),
     logLevel: 'debug',
   })
 );

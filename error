@@ -1,0 +1,12 @@
+You need to specify the database name. Your URI without a db defaults to “test”, so your old movies won’t show.
+Two options (pick one):
+Easiest: put the db name in the URI
+Set in Jenkins: MONGO_URI=mongodb+srv://abhi_db_user:...@cluster0.ffzf1bw.mongodb.net/YourDbName
+Or keep your URI and set MONGO_DB_NAME
+In Jenkins “Generate .env” stage, also write: MONGO_DB_NAME=YourDbName
+Then rerun the pipeline.
+Quick verify:
+curl http://<EC2_IP>:5000/health → should be UP
+curl http://<EC2_IP>:8000/movies → should return your existing docs
+Open http://<EC2_IP>:3001 → list should populate
+What is YourDbName? It’s the database in Atlas that already contains your movies (e.g., “movies”, “prod”, etc.). If unsure, open Atlas → Collections and copy the db name shown above the movies collection.

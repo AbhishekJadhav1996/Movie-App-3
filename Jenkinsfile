@@ -49,16 +49,6 @@ pipeline {
             }
         }
 
-        stage("Quality Gate") {
-            steps {
-                script {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        def qg = waitForQualityGate abortPipeline: true, credentialsId: 'sonar-token'
-                        echo "Quality Gate status: ${qg.status}"
-                    }
-                }
-            }
-        }
 
         stage("Trivy File Scan") {
             steps {

@@ -28,14 +28,15 @@ services:
     environment:
       - PORT=${GATEWAY_PORT}
     depends_on:
-      backend:
-        condition: service_started
+      - backend
     restart: unless-stopped
 
   frontend:
     build:
       context: ./movie-app-frontend-master
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
     image: abhishekjadhav1996/movie-frontend:latest
     container_name: movie-frontend
     ports:
@@ -44,15 +45,83 @@ services:
       - .env
     environment:
       - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}
-    build:
-      context: ./movie-app-frontend-master
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
     depends_on:
-      gateway:
-        condition: service_started
+      - gateway
     restart: unless-stopped
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# version: '3.8'
+
+# services:
+#   backend:
+#     build:
+#       context: ./movie-app-backend-master
+#       dockerfile: Dockerfile
+#     image: abhishekjadhav1996/movie-backend:latest
+#     container_name: movie-backend
+#     ports:
+#       - "${BACKEND_PORT}:${BACKEND_PORT}"
+#     env_file:
+#       - .env
+#     environment:
+#       - PORT=${BACKEND_PORT}
+#     restart: unless-stopped
+
+#   gateway:
+#     build:
+#       context: ./api-gateway
+#       dockerfile: Dockerfile
+#     image: abhishekjadhav1996/movie-gateway:latest
+#     container_name: movie-gateway
+#     ports:
+#       - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+#     env_file:
+#       - .env
+#     environment:
+#       - PORT=${GATEWAY_PORT}
+#     depends_on:
+#       backend:
+#         condition: service_started
+#     restart: unless-stopped
+
+#   frontend:
+#     build:
+#       context: ./movie-app-frontend-master
+#       dockerfile: Dockerfile
+#     image: abhishekjadhav1996/movie-frontend:latest
+#     container_name: movie-frontend
+#     ports:
+#       - "${FRONTEND_PORT}:3000"
+#     env_file:
+#       - .env
+#     environment:
+#       - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}
+#     build:
+#       context: ./movie-app-frontend-master
+#       dockerfile: Dockerfile
+#       args:
+#         REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
+#     depends_on:
+#       gateway:
+#         condition: service_started
+#     restart: unless-stopped
 
 
 

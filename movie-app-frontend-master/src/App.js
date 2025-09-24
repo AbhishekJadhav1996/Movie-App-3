@@ -12,15 +12,22 @@ function App() {
   const [movies, setMovies] = useState([]);
   const [currentHero, setCurrentHero] = useState(null);
 
+  const SAMPLE_MOVIES = [
+    { _id: 's1', title: 'The Dark Knight', genre: 'Action', year: 2008, rating: 9.0 },
+    { _id: 's2', title: 'Inception', genre: 'Sci-Fi', year: 2010, rating: 8.8 },
+    { _id: 's3', title: 'Interstellar', genre: 'Sci-Fi', year: 2014, rating: 8.6 },
+  ];
+
   // Fetch movies on mount
   useEffect(() => {
     const fetchMovies = async () => {
       try {
         const { data } = await getMovies();
-        setMovies(Array.isArray(data) ? data : data.movies || []);
+        const list = Array.isArray(data) ? data : data.movies || [];
+        setMovies(list.length ? list : SAMPLE_MOVIES);
       } catch (error) {
         console.error("Error fetching movies:", error);
-        setMovies([]);
+        setMovies(SAMPLE_MOVIES);
       }
     };
     fetchMovies();

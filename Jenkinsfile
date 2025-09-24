@@ -7,12 +7,14 @@ pipeline {
     }
 
     environment {
+        SCANNER_HOME = tool 'sonar-scanner'
         BACKEND_PORT = '5000'
         GATEWAY_PORT = '8000'
         FRONTEND_PORT = '3001'
     }
 
     stages {
+
         stage("Clean Workspace") {
             steps { cleanWs() }
         }
@@ -33,11 +35,43 @@ pipeline {
             }
         }
 
+        stage("SonarQube Analysis") {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=movie \
+                        -Dsonar.projectKey=movie \
+                        -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/** \
+                        -Dsonar.javascript.node.maxspace=4096
+                    """
+                }
+            }
+        }
+
+        stage("Quality Gate") {
+            steps {
+                script {
+                    timeout(time: 10, unit: 'MINUTES') {
+                        def qg = waitForQualityGate abortPipeline: true, credentialsId: 'sonar-token'
+                        echo "Quality Gate status: ${qg.status}"
+                    }
+                }
+            }
+        }
+
+        stage("Trivy File Scan") {
+            steps {
+                dir("api-gateway") { sh "trivy fs . > trivy-api-gateway.txt" }
+                dir("movie-app-backend-master") { sh "trivy fs . > trivy-backend.txt" }
+                dir("movie-app-frontend-master") { sh "trivy fs . > trivy-frontend.txt" }
+            }
+        }
+
         stage("Generate .env") {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'mongo-uri', variable: 'MONGO_URI')]) {
-                        // we need Groovy interpolation here for ${BACKEND_PORT}, etc.
                         sh """
 PUBLIC_IP=\$(curl -s http://checkip.amazonaws.com)
 
@@ -61,11 +95,29 @@ EOF
             }
         }
 
+        stage("Trivy Docker Image Scan") {
+            steps {
+                script {
+                    def images = [
+                        "abhishekjadhav1996/movie-backend:latest",
+                        "abhishekjadhav1996/movie-gateway:latest",
+                        "abhishekjadhav1996/movie-frontend:latest"
+                    ]
+                    for (img in images) {
+                        sh """
+                            echo "🔍 Scanning image: ${img}"
+                            trivy image -f json -o trivy-${img.replaceAll("[/:]", "_")}.json ${img}
+                            trivy image -f table -o trivy-${img.replaceAll("[/:]", "_")}.txt ${img}
+                        """
+                    }
+                }
+            }
+        }
+
         stage("Docker Compose Build & Deploy") {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PWD')]) {
-                        // use single quotes, no Groovy interpolation needed
                         sh '''
 echo "$DOCKER_PWD" | docker login -u "$DOCKER_USER" --password-stdin
 docker compose --env-file .env up --build -d
@@ -80,7 +132,6 @@ docker ps --filter "name=movie"
         stage("Health Checks") {
             steps {
                 script {
-                    // here we mix Jenkins env vars (${BACKEND_PORT}), so keep """
                     sh """
 PUBLIC_IP=\$(curl -s http://checkip.amazonaws.com)
 echo "Probing services on \$PUBLIC_IP"
@@ -107,7 +158,6 @@ done
         stage("Push Docker Images") {
             steps {
                 script {
-                    // no Groovy interpolation, so use single-quoted block
                     sh '''
 docker push abhishekjadhav1996/movie-backend:latest
 docker push abhishekjadhav1996/movie-gateway:latest
@@ -117,7 +167,7 @@ docker push abhishekjadhav1996/movie-frontend:latest
             }
         }
 
-    } // closes stages
+    } // stages
 
     post {
         always { echo "Pipeline finished. Containers left running for inspection." }
@@ -125,6 +175,135 @@ docker push abhishekjadhav1996/movie-frontend:latest
         failure { echo "❌ Pipeline failed. Check logs for details." }
     }
 }
+
+
+// pipeline {
+//     agent any
+
+//     tools {
+//         jdk 'jdk17'
+//         nodejs 'node22'
+//     }
+
+//     environment {
+//         BACKEND_PORT = '5000'
+//         GATEWAY_PORT = '8000'
+//         FRONTEND_PORT = '3001'
+//     }
+
+//     stages {
+//         stage("Clean Workspace") {
+//             steps { cleanWs() }
+//         }
+
+//         stage("Git Checkout") {
+//             steps {
+//                 git branch: 'main', url: 'https://github.com/AbhishekJadhav1996/MovieApp.git'
+//             }
+//         }
+
+//         stage("Install NPM Dependencies") {
+//             steps {
+//                 parallel(
+//                     "API Gateway": { dir("api-gateway") { sh 'npm install --legacy-peer-deps --no-audit --no-fund' } },
+//                     "Backend": { dir("movie-app-backend-master") { sh 'npm install --legacy-peer-deps --no-audit --no-fund' } },
+//                     "Frontend": { dir("movie-app-frontend-master") { sh 'npm install --legacy-peer-deps --no-audit --no-fund' } }
+//                 )
+//             }
+//         }
+
+//         stage("Generate .env") {
+//             steps {
+//                 script {
+//                     withCredentials([string(credentialsId: 'mongo-uri', variable: 'MONGO_URI')]) {
+//                         // we need Groovy interpolation here for ${BACKEND_PORT}, etc.
+//                         sh """
+// PUBLIC_IP=\$(curl -s http://checkip.amazonaws.com)
+
+// cat > .env <<EOF
+// BACKEND_PORT=${BACKEND_PORT}
+// GATEWAY_PORT=${GATEWAY_PORT}
+// FRONTEND_PORT=${FRONTEND_PORT}
+
+// MONGO_URI=${MONGO_URI}
+
+// # Frontend env consumed by React (browser must reach gateway via public IP)
+// REACT_APP_API_BASE_URL=http://\$PUBLIC_IP:${GATEWAY_PORT}
+// REACT_APP_WS_URL=ws://\$PUBLIC_IP:${BACKEND_PORT}/ws
+
+// # Gateway internal upstream to backend inside the Docker network
+// MOVIE_SERVICE_URL=http://backend:${BACKEND_PORT}
+// EOF
+// """
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage("Docker Compose Build & Deploy") {
+//             steps {
+//                 script {
+//                     withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PWD')]) {
+//                         // use single quotes, no Groovy interpolation needed
+//                         sh '''
+// echo "$DOCKER_PWD" | docker login -u "$DOCKER_USER" --password-stdin
+// docker compose --env-file .env up --build -d
+// docker compose logs --tail=50
+// docker ps --filter "name=movie"
+// '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage("Health Checks") {
+//             steps {
+//                 script {
+//                     // here we mix Jenkins env vars (${BACKEND_PORT}), so keep """
+//                     sh """
+// PUBLIC_IP=\$(curl -s http://checkip.amazonaws.com)
+// echo "Probing services on \$PUBLIC_IP"
+
+// # Backend
+// for i in 1 2 3 4 5; do
+//   (curl -sf http://\$PUBLIC_IP:${BACKEND_PORT}/health && echo "backend OK") && break || (echo "waiting backend" && sleep 5)
+// done
+
+// # Gateway
+// for i in 1 2 3 4 5; do
+//   (curl -sf http://\$PUBLIC_IP:${GATEWAY_PORT}/health && echo "gateway OK") && break || (echo "waiting gateway" && sleep 5)
+// done
+
+// # Frontend
+// for i in 1 2 3 4 5; do
+//   (curl -sfL http://\$PUBLIC_IP:${FRONTEND_PORT} && echo "frontend OK") && break || (echo "waiting frontend" && sleep 5)
+// done
+// """
+//                 }
+//             }
+//         }
+
+//         stage("Push Docker Images") {
+//             steps {
+//                 script {
+//                     // no Groovy interpolation, so use single-quoted block
+//                     sh '''
+// docker push abhishekjadhav1996/movie-backend:latest
+// docker push abhishekjadhav1996/movie-gateway:latest
+// docker push abhishekjadhav1996/movie-frontend:latest
+// '''
+//                 }
+//             }
+//         }
+
+//     } // closes stages
+
+//     post {
+//         always { echo "Pipeline finished. Containers left running for inspection." }
+//         success { echo "✅ Build, deploy, and health checks succeeded!" }
+//         failure { echo "❌ Pipeline failed. Check logs for details." }
+//     }
+// }
 
 
 

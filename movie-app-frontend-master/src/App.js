@@ -15,7 +15,7 @@ function App() {
   const SAMPLE_MOVIES = [
     { _id: 's1', title: 'The Dark Knight', genre: 'Action', year: 2008, rating: 9.0 },
     { _id: 's2', title: 'Inception', genre: 'Sci-Fi', year: 2010, rating: 8.8 },
-    { _id: 's3', title: 'Interstellar', genre: 'Sci-Fi', year: 2014, rating: 8.6 },
+    { _id: 's3', title: 'Daagdi Chawl', genre: 'Action', year: 2014, rating: 8.6 },
   ];
 
   // Fetch movies on mount

@@ -18,14 +18,16 @@ const movieHeroMap = {
 };
 
 function App() {
-  const [movies, setMovies] = useState([]);
-  const [currentHero, setCurrentHero] = useState(null);
-
+  // Sample fallback movies
   const SAMPLE_MOVIES = [
     { _id: "s1", title: "The Dark Knight", genre: "Action", year: 2008, rating: 9.0 },
     { _id: "s2", title: "Inception", genre: "Sci-Fi", year: 2010, rating: 8.8 },
     { _id: "s3", title: "Daagdi Chawl", genre: "Action", year: 2014, rating: 8.6 },
   ];
+
+  // ✅ preload with sample movies so UI never looks empty
+  const [movies, setMovies] = useState(SAMPLE_MOVIES);
+  const [currentHero, setCurrentHero] = useState(null);
 
   // Fetch movies on mount
   useEffect(() => {
@@ -33,10 +35,12 @@ function App() {
       try {
         const { data } = await getMovies();
         const list = Array.isArray(data) ? data : data.movies || [];
-        setMovies(list.length ? list : SAMPLE_MOVIES);
+        if (list.length) {
+          setMovies(list); // replace only if API has movies
+        }
       } catch (error) {
         console.error("Error fetching movies:", error);
-        setMovies(SAMPLE_MOVIES);
+        // keep showing SAMPLE_MOVIES
       }
     };
     fetchMovies();
@@ -88,6 +92,7 @@ function App() {
 }
 
 export default App;
+
 
 // import React, { useEffect, useState } from "react";
 // import { getMovies, addMovie, deleteMovie } from "./api";
